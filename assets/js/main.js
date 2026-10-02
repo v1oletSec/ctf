@@ -67,13 +67,13 @@
   const termLines = [
     ["cmd", "whoami"],
     ["out", "v1olet, ctf team since august 2026"],
-    ["cmd", "wc -l roster.txt"],
+    ["cmd", "wc -l mainroster.txt"],
     ["out", `${players.length} players`],
     ["cmd", "grep -c . placements.log"],
     ["out", `${placements.length} ctfs, ${podiumCount} on the podium`],
     ["cmd", "head -1 placements.log"],
     ["out", `${bestP.rank}${ordinal(bestP.rank)}  ${bestP.event}${bestP.note ? " (" + bestP.note.toLowerCase() + ")" : ""}`],
-    ["cmd", "cut -d, -f2 roster.csv | sort | uniq -c | sort -rn | head -3"],
+    ["cmd", "cut -d, -f2 mainroster.csv | sort | uniq -c | sort -rn | head -3"],
     ["out", topSkills],
   ];
   const term = $("#term");
@@ -391,39 +391,55 @@
     io.observe(deck);
   }
 
-  /* ============================================================ scramble */
-  const GLYPHS = "!<>-_\\/[]{}=+*^?#01v1";
-  const scramble = (el) => {
-    const final = el.dataset.text || el.textContent;
-    el.dataset.text = final;
-    el.setAttribute("aria-label", final);
-    let frame = 0;
-    const total = final.length * 2.2 + 12;
-    const tick = () => {
-      let out = "";
-      for (let i = 0; i < final.length; i++) {
-        const lock = i * 2.2 + 6;
-        if (final[i] === " " || frame >= lock) out += final[i];
-        else out += `<span class="sc">${GLYPHS[(Math.random() * GLYPHS.length) | 0]}</span>`;
-      }
-      el.innerHTML = out;
-      if (frame++ < total) requestAnimationFrame(tick);
-      else el.textContent = final;
+  /* ====================================================== heading reveal */
+  // Headings are split into words > letters once; letters rise out of a mask
+  // when the heading scrolls in. Final text is in place from the start, so
+  // nothing reflows or jumps while it animates.
+  const splitText = (el) => {
+    el.setAttribute("aria-label", el.textContent.replace(/\s+/g, " ").trim());
+    let ci = 0;
+    const walk = (node) => {
+      [...node.childNodes].forEach((n) => {
+        if (n.nodeType === 1) {
+          if (n.tagName !== "BR") walk(n);
+          return;
+        }
+        if (n.nodeType !== 3 || !n.textContent.trim()) return;
+        const frag = document.createDocumentFragment();
+        n.textContent.split(/(\s+)/).forEach((part) => {
+          if (!part) return;
+          if (/^\s+$/.test(part)) return frag.appendChild(document.createTextNode(" "));
+          const w = document.createElement("span");
+          w.className = "w";
+          w.setAttribute("aria-hidden", "true");
+          for (const ch of part) {
+            const c = document.createElement("span");
+            c.className = "c";
+            c.textContent = ch;
+            c.style.setProperty("--ci", ci++);
+            w.appendChild(c);
+          }
+          frag.appendChild(w);
+        });
+        n.replaceWith(frag);
+      });
     };
-    tick();
+    walk(el);
+    el.classList.add("is-split");
   };
+
   if (!reduceMotion) {
+    $$(".split").forEach(splitText);
     const io = new IntersectionObserver(
       (entries) =>
         entries.forEach((e) => {
-          if (e.isIntersecting) {
-            io.unobserve(e.target);
-            scramble(e.target);
-          }
+          if (!e.isIntersecting) return;
+          io.unobserve(e.target);
+          e.target.classList.add("is-in");
         }),
-      { threshold: 0.6 }
+      { threshold: 0, rootMargin: "0px 0px -15% 0px" }
     );
-    $$(".scramble").forEach((el) => io.observe(el));
+    $$(".split, .eyebrow").forEach((el) => io.observe(el));
   }
 
   /* ============================================================== footer */

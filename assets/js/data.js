@@ -51,14 +51,12 @@ window.V1 = {
   players: [
     {
       name: "Existing",
-      role: "Captain",
       focus: "Web exploitation",
       quote: "At every point of Existence, meaning lurks",
       skills: ["web", "misc", "osint"],
     },
     {
       name: "ctxzero",
-      role: "Captain",
       focus: "Penetration testing",
       quote: "Sky is the Limit",
       skills: ["pentest", "redteam", "web", "pwn"],
@@ -151,7 +149,7 @@ window.V1 = {
     },
     { name: "sg0924", skills: ["crypto", "osint"] },
     { name: "Tr4ceAng3l", skills: ["forensics", "sigint", "ew"] },
-    { name: "ra1ncandy" },
+    { name: "ra1ncandy", skills: ["ai", "dfir"] },
   ],
 
   placements: [

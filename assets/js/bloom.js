@@ -125,7 +125,6 @@
     const active = now - ptr.last < 2200 ? 1 : 0;
     ptr.on += (active - ptr.on) * 0.05;
 
-    const revealR = reduceMotion ? 1e5 : since * 900;
     const R = Math.min(220, Math.max(150, W * 0.14));
     const legR = Math.min(W, H) * 0.42;
 
@@ -137,16 +136,13 @@
     }
 
     for (const c of cells) {
-      const dxo = c.x - origin.x, dyo = c.y - origin.y;
-      const dOrigin = Math.sqrt(dxo * dxo + dyo * dyo);
-      const born = smooth(revealR, revealR - 160, dOrigin);
+      // fade the field in softly, each flower at its own moment
+      const born = reduceMotion ? 1 : smooth(c.seed * 1.2, c.seed * 1.2 + 0.8, since);
       if (born <= 0.001) continue;
 
       const wave = 0.5 + 0.5 * Math.sin(c.x * 0.011 + t * 0.55) * Math.cos(c.y * 0.014 - t * 0.4);
       let base = 0.035 + wave * 0.07;
 
-      // flash on the reveal front
-      const front = Math.exp(-(((dOrigin - revealR + 80) / 70) ** 2)) * (since < 3 ? 1 : 0);
 
       const dx = c.x - ptr.x, dy = c.y - ptr.y;
       const dp = Math.sqrt(dx * dx + dy * dy);
@@ -162,7 +158,7 @@
       }
       g = Math.min(1, g);
 
-      c.heat += (Math.max(f, g, front) - c.heat) * 0.18;
+      c.heat += (Math.max(f, g) - c.heat) * 0.18;
       const h = c.heat;
 
       // keep the wordmark readable

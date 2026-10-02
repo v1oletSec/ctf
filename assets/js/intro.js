@@ -1,7 +1,8 @@
-// v1olet intro: the "o" of the logo draws itself, the flower blooms in,
-// then the whole thing flies into its place in the hero wordmark.
+// v1olet intro: the wordmark rises out of a mask while a counter loads to
+// 100, then the panel lifts away like a curtain (with a violet layer trailing
+// behind it) and the hero builds itself underneath.
 // Plays once per browser session. Click / Esc / Enter / Space skips it.
-// main.js waits on window.V1Intro before starting the hero reveal.
+// main.js and bloom.js wait on window.V1Intro before starting the hero.
 (() => {
   const root = document.documentElement;
   const intro = document.getElementById("intro");
@@ -16,84 +17,61 @@
   if ("scrollRestoration" in history) history.scrollRestoration = "manual";
   scrollTo(0, 0);
 
-  const o = document.getElementById("intro-o");
-  const log = document.getElementById("intro-log");
+  const bar = document.getElementById("intro-bar");
+  const count = document.getElementById("intro-count");
   const skip = document.getElementById("intro-skip");
-  const { players = [], placements = [] } = window.V1 || {};
-  const podiums = placements.filter((p) => p.rank <= 3).length;
 
-  const lines = [
-    "$ ./v1olet --init",
-    `  roster ......... ${players.length} players`,
-    `  placements ..... ${placements.length} ctfs / ${podiums} podiums`,
-    "  status ......... blooming",
-  ];
-
-  const timers = [];
-  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
   let resolve;
   window.V1Intro = new Promise((r) => (resolve = r));
-  let finished = false;
+  let leaving = false;
+  const timers = [];
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
 
-  // type the log fast, line by line
-  let text = "";
-  let li = 0, ci = 0;
-  const typeLog = () => {
-    if (li >= lines.length) return;
-    const line = lines[li];
-    text += line[ci++] || "";
-    if (ci > line.length) { text += "\n"; li++; ci = 0; }
-    log.textContent = text;
-    later(typeLog, ci === 0 ? 70 : 9);
+  // counter 000 -> 100, eased so it slows down near the end
+  const DUR = 1350;
+  const t0 = performance.now() + 150;
+  let raf = 0;
+  const tick = (now) => {
+    const k = Math.min(1, Math.max(0, (now - t0) / DUR));
+    const e = 1 - Math.pow(1 - k, 3);
+    const v = Math.round(e * 100);
+    count.textContent = String(v).padStart(3, "0");
+    bar.style.transform = `scaleX(${e})`;
+    if (k < 1) raf = requestAnimationFrame(tick);
   };
-  later(typeLog, 120);
+  raf = requestAnimationFrame(tick);
 
-  later(() => intro.classList.add("s-ring"), 150);
-  later(() => intro.classList.add("s-flower"), 520);
-  later(() => intro.classList.add("s-disk"), 980);
-  later(() => intro.classList.add("s-pulse"), 1350);
-  later(handoff, 1950);
+  requestAnimationFrame(() => intro.classList.add("is-in"));
+  later(leave, 1700);
 
-  function handoff() {
-    if (finished) return;
-    finished = true;
+  function leave() {
+    if (leaving) return;
+    leaving = true;
     timers.forEach(clearTimeout);
-    log.textContent = lines.join("\n");
+    cancelAnimationFrame(raf);
+    count.textContent = "100";
+    bar.style.transform = "scaleX(1)";
 
-    const target = document.getElementById("mark-o");
-    const a = o.getBoundingClientRect();
-    const b = target ? target.getBoundingClientRect() : null;
-
-    intro.classList.add("s-ring", "s-flower", "s-disk", "s-fly");
-    root.classList.add("intro-flying");
-    resolve(); // hero starts revealing underneath
-
-    if (b && b.width) {
-      const dx = b.left + b.width / 2 - (a.left + a.width / 2);
-      const dy = b.top + b.height / 2 - (a.top + a.height / 2);
-      const s = b.width / a.width;
-      o.style.transform = `translate(${dx}px, ${dy}px) scale(${s})`;
-    } else {
-      o.style.opacity = "0";
-    }
-
+    intro.classList.add("is-in", "is-out");            // wordmark + labels leave
+    setTimeout(() => intro.classList.add("is-lift"), 260); // panel lifts
     setTimeout(() => {
-      root.classList.remove("intro-on", "intro-flying");
-      intro.remove();
-    }, 1000);
+      root.classList.remove("intro-on");
+      resolve();                                         // hero builds underneath
+    }, 560);
+    setTimeout(() => intro.remove(), 1500);
   }
 
   const onKey = (e) => {
     if (["Escape", "Enter", " "].includes(e.key)) {
       e.preventDefault();
-      handoff();
       removeEventListener("keydown", onKey);
+      leave();
     }
   };
   addEventListener("keydown", onKey);
-  intro.addEventListener("click", handoff);
-  skip.addEventListener("click", handoff);
+  intro.addEventListener("click", leave);
+  skip.addEventListener("click", leave);
 
   // safety net: never leave the page covered
-  setTimeout(handoff, 5000);
+  setTimeout(leave, 5000);
 })();
