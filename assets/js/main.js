@@ -13,10 +13,10 @@
   };
   const slug = (name) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+  // the logo flower (traced from the wordmark, defined once as <symbol> in index.html)
   const FLOWER =
-    '<svg viewBox="-50 -50 100 100" aria-hidden="true"><g fill="currentColor">' +
-    [0, 60, 120, 180, 240, 300].map((a) => `<ellipse cx="0" cy="-25" rx="15" ry="23" transform="rotate(${a + 15})"/>`).join("") +
-    '</g><circle r="9" fill="var(--flower-core, #fff)"/></svg>';
+    '<svg viewBox="-50 -50 100 100" aria-hidden="true"><use href="#v1-flower" fill="currentColor"/>' +
+    '<circle r="8.6" fill="var(--flower-core, #fff)"/></svg>';
 
   const ICONS = {
     github: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.29-5.25-1.28-5.25-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.7 5.4-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>',
@@ -29,7 +29,7 @@
   const LINK_LABEL = { github: "GitHub", linkedin: "LinkedIn", website: "Website", x: "X" };
 
   /* ============================================================ hero type */
-  const heroLines = ["capture the flag team", "web / pwn / rev / crypto", "est. 2025", "we play to win"];
+  const heroLines = ["capture the flag team", "web / pwn / rev / crypto / forensics", "est. august 2026", "we play to win"];
   const heroEl = $("#hero-type");
   if (!reduceMotion && heroEl) {
     let li = 0;
@@ -45,30 +45,36 @@
       setTimeout(() => type(heroLines[li]), 300);
     };
     heroEl.textContent = "";
-    setTimeout(() => type(heroLines[0]), 900);
+    (window.V1Intro || Promise.resolve()).then(() => setTimeout(() => type(heroLines[0]), 900));
   }
 
   /* ========================================================= category strip */
   const skillCounts = {};
   players.forEach((p) => (p.skills || []).forEach((s) => (skillCounts[s] = (skillCounts[s] || 0) + 1)));
   const skillOrder = Object.keys(skillCounts).sort((a, b) => skillCounts[b] - skillCounts[a]);
-  const stripItems = ["web", "pwn", "rev", "crypto", "forensics", "osint", "misc", "blockchain", "cloud"]
+  const stripItems = ["web", "pwn", "rev", "crypto", "forensics", "osint", "misc", "dfir", "ai", "mobile", "cloud", "sigint"]
     .map((s) => `<span>${esc(SKILLS[s] || s)}</span><i>${FLOWER}</i>`)
     .join("");
   $("#strip").innerHTML = `<div>${stripItems}</div><div>${stripItems}</div>`;
 
   /* ============================================================== terminal */
   const podiumCount = placements.filter((p) => p.rank <= 3).length;
+  const topSkills = skillOrder
+    .slice(0, 3)
+    .map((k) => `${String(skillCounts[k]).padStart(4)} ${(SKILLS[k] || k).toLowerCase()}`)
+    .join("\n");
   const bestP = [...placements].sort((a, b) => a.rank - b.rank)[0];
   const termLines = [
     ["cmd", "whoami"],
-    ["out", "v1olet, ctf team since 2025"],
+    ["out", "v1olet, ctf team since august 2026"],
     ["cmd", "wc -l roster.txt"],
     ["out", `${players.length} players`],
     ["cmd", "grep -c . placements.log"],
     ["out", `${placements.length} ctfs, ${podiumCount} on the podium`],
     ["cmd", "head -1 placements.log"],
     ["out", `${bestP.rank}${ordinal(bestP.rank)}  ${bestP.event}${bestP.note ? " (" + bestP.note.toLowerCase() + ")" : ""}`],
+    ["cmd", "cut -d, -f2 roster.csv | sort | uniq -c | sort -rn | head -3"],
+    ["out", topSkills],
   ];
   const term = $("#term");
   const termHTML = (lines, partial = "") =>
@@ -112,42 +118,120 @@
   }
 
   /* ============================================================ placements */
-  const sorted = [...placements].sort((a, b) => a.rank - b.rank);
+  // "731 teams" -> 731, "1k+ teams" -> 1000, "7000+ teams" -> 7000
+  const teamsOf = (p) => {
+    const m = String(p.field || "").replace(/,/g, "").match(/(\d+(?:\.\d+)?)\s*(k)?/i);
+    return m ? Math.round(parseFloat(m[1]) * (m[2] ? 1000 : 1)) : 0;
+  };
+  const topPct = (p) => {
+    const n = teamsOf(p);
+    if (!n || n < p.rank) return null;
+    const v = (p.rank / n) * 100;
+    return v < 1 ? v.toFixed(1).replace(/\.0$/, "") : String(Math.max(1, Math.round(v)));
+  };
+  const sorted = [...placements].sort((a, b) => a.rank - b.rank || teamsOf(b) - teamsOf(a));
   const top = sorted.filter((p) => p.rank <= 3);
   const rest = sorted.filter((p) => p.rank > 3);
 
-  // podium order: runner-up, winner, then the rest of the top three
-  const podiumOrder = top.length > 1 ? [top[1], top[0], ...top.slice(2)] : top;
-  $("#podium").innerHTML = podiumOrder
-    .map((p) => {
+  /* stats row */
+  const best = sorted
+    .map((p) => ({ p, v: topPct(p) }))
+    .filter((x) => x.v !== null)
+    .sort((a, b) => parseFloat(a.v) - parseFloat(b.v) || teamsOf(b.p) - teamsOf(a.p))[0];
+  const stats = [
+    { n: placements.length, label: "CTFs on the board" },
+    { n: top.length, label: "podium finishes" },
+    { n: placements.filter((p) => p.rank === 1).length, label: placements.filter((p) => p.rank === 1).length === 1 ? "first place" : "first places" },
+  ];
+  if (best) stats.push({ n: parseFloat(best.v), pre: "top ", suf: "%", dec: best.v.includes(".") ? 1 : 0, label: `best finish, ${best.p.event}` });
+  $("#stats").innerHTML = stats
+    .map(
+      (s) => `
+      <div class="stat">
+        <dt>${esc(s.label)}</dt>
+        <dd>${s.pre ? `<small>${s.pre}</small>` : ""}<span data-count="${s.n}" data-dec="${s.dec || 0}">${reduceMotion ? s.n : 0}</span>${s.suf ? `<small>${s.suf}</small>` : ""}</dd>
+      </div>`
+    )
+    .join("");
+
+  /* medal cards */
+  const TIER = { 1: "gold", 2: "silver", 3: "bronze" };
+  $("#medals").innerHTML = top
+    .map((p, i) => {
+      const pct = topPct(p);
+      const meta = [p.note, p.field].filter(Boolean).map(esc).join(" · ");
       const inner = `
-        <div class="step-label">
-          <h3>${esc(p.event)}</h3>
-          <p>${[p.note, p.field].filter(Boolean).map(esc).join(", ") || "&nbsp;"}</p>
-        </div>
-        <div class="step-block">
-          <span class="step-rank">${p.rank}<sup>${ordinal(p.rank)}</sup></span>
-          <span class="step-flower">${FLOWER}</span>
+        <div class="medal-inner">
+          <div class="medal-top">
+            <span class="medal-tier">${TIER[p.rank]}</span>
+            ${p.url ? `<span class="medal-go">${ICONS.arrow}</span>` : ""}
+          </div>
+          <div class="medal-disc" aria-hidden="true">
+            <span class="medal-ribbon"></span>
+            <span class="medal-face">${FLOWER}</span>
+          </div>
+          <p class="medal-rank">${p.rank}<sup>${ordinal(p.rank)}</sup></p>
+          <h3 class="medal-event">${esc(p.event)}</h3>
+          <p class="medal-meta">${meta || "&nbsp;"}</p>
+          ${pct ? `<span class="medal-pct">top ${pct}%</span>` : ""}
+          <div class="pc-holo" aria-hidden="true"></div>
+          <div class="pc-glare" aria-hidden="true"></div>
         </div>`;
+      const attrs = `class="medal tilt t-${TIER[p.rank]}" style="--i:${i}"`;
       return p.url
-        ? `<a class="step r${p.rank}" href="${esc(p.url)}" target="_blank" rel="noopener">${inner}</a>`
-        : `<div class="step r${p.rank}">${inner}</div>`;
+        ? `<a ${attrs} href="${esc(p.url)}" target="_blank" rel="noopener" aria-label="${esc(p.event)}: ${p.rank}${ordinal(p.rank)} place">${inner}</a>`
+        : `<div ${attrs}>${inner}</div>`;
     })
     .join("");
 
-  $("#board").innerHTML = rest
-    .map((p) => {
+  /* ledger */
+  $("#ledger").innerHTML = rest
+    .map((p, i) => {
       const tag = p.url ? "a" : "div";
       const attrs = p.url ? ` href="${esc(p.url)}" target="_blank" rel="noopener"` : "";
+      const pct = topPct(p);
       return `
-        <${tag} class="board-row" role="row"${attrs}>
-          <span class="b-rank" role="cell">#${String(p.rank).padStart(2, "0")}</span>
-          <span class="b-event" role="cell">${esc(p.event)}${p.note ? `<em>${esc(p.note)}</em>` : ""}</span>
-          <span class="b-field" role="cell">${p.field ? esc(p.field) : ""}</span>
-          <span class="b-go" role="cell">${p.url ? ICONS.arrow : ""}</span>
+        <${tag} class="lg-row" role="listitem" style="--i:${i}"${attrs}>
+          <span class="lg-rank" aria-label="Rank ${p.rank}">${String(p.rank).padStart(2, "0")}</span>
+          <span class="lg-main">
+            <span class="lg-event">${esc(p.event)}</span>
+            ${p.note ? `<span class="lg-note">${esc(p.note)}</span>` : ""}
+          </span>
+          <span class="lg-field">${p.field ? esc(p.field) : ""}</span>
+          <span class="lg-pct">${pct ? `top ${pct}%` : ""}</span>
+          <span class="lg-go">${p.url ? ICONS.arrow : ""}</span>
         </${tag}>`;
     })
     .join("");
+
+  /* count-up + staggered reveal when the section scrolls in */
+  const countUp = (el) => {
+    const end = parseFloat(el.dataset.count);
+    const dec = +el.dataset.dec || 0;
+    const t0 = performance.now();
+    const dur = 1400;
+    const tick = (now) => {
+      const k = Math.min(1, (now - t0) / dur);
+      const e = 1 - Math.pow(1 - k, 4);
+      // "top x%" counts down from 100 so it reads as climbing the board
+      const v = dec ? 100 - (100 - end) * e : end * e;
+      el.textContent = dec ? v.toFixed(dec) : Math.round(v);
+      if (k < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  const reveal = new IntersectionObserver(
+    (entries) =>
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        reveal.unobserve(e.target);
+        e.target.classList.add("is-in");
+        if (!reduceMotion) $$("[data-count]", e.target).forEach(countUp);
+      }),
+    { threshold: 0, rootMargin: "0px 0px -12% 0px" }
+  );
+  ["#stats", "#medals", "#ledger"].forEach((s) => reveal.observe($(s)));
+  if (reduceMotion) $$("[data-count]").forEach((el) => (el.textContent = el.dataset.count));
 
   /* =============================================================== players */
   const hue = (name) => {
@@ -158,13 +242,14 @@
   const initials = (name) => (name.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || "?").toUpperCase();
   const hasProfile = (p) => p.quote || (p.skills && p.skills.length) || (p.links && Object.keys(p.links).length);
 
+  const pad = (n) => String(n).padStart(2, "0");
   const deckOrder = [
     ...players.filter((p) => p.role),
     ...players.filter((p) => !p.role && hasProfile(p)),
     ...players.filter((p) => !p.role && !hasProfile(p)),
   ];
 
-  const front = (p) => {
+  const front = (p, no) => {
     const skills = p.skills || [];
     const links = Object.entries(p.links || {});
     const main = skills[0] ? SKILLS[skills[0]] || skills[0] : "";
@@ -174,6 +259,7 @@
         ${main ? `<span class="pc-type">${esc(main)}</span>` : ""}
         ${p.role ? `<span class="pc-role">${esc(p.role)}</span>` : ""}
         <div class="pc-avatar" data-slug="${slug(p.name)}">${esc(initials(p.name))}</div>
+        <span class="pc-no">No.${pad(no)}</span>
       </div>
       <div class="pc-body">
         <h3 class="pc-name">${esc(p.name)}</h3>
@@ -187,25 +273,26 @@
                 .join("")}</div>`
             : ""
         }
+        <div class="pc-foot"><span>v1olet</span><span>${skills.length} ${skills.length === 1 ? "skill" : "skills"}</span><i>${FLOWER}</i></div>
       </div>`;
   };
 
-  const back = (p) => `
+  const back = (p, no) => `
       <div class="pc-back">
         <div class="pc-back-flower">${FLOWER}</div>
         <div class="pc-back-avatar" data-slug="${slug(p.name)}"></div>
         <h3 class="pc-name">${esc(p.name)}</h3>
-        <p class="pc-back-mark">v1olet</p>
+        <p class="pc-back-mark">v1olet · No.${pad(no)} · profile soon</p>
       </div>`;
 
   const deck = $("#deck");
   deck.innerHTML = deckOrder
-    .map((p) => {
+    .map((p, i) => {
       const full = hasProfile(p) || p.role;
       return `
-      <li class="pc${p.role ? " is-captain" : ""}${full ? "" : " is-back"}" data-skills="${(p.skills || []).join(" ")}" style="--h:${hue(p.name)}">
+      <li class="pc tilt${p.role ? " is-captain" : ""}${full ? "" : " is-back"}" data-skills="${(p.skills || []).join(" ")}" style="--h:${hue(p.name)}">
         <div class="pc-inner">
-          ${full ? front(p) : back(p)}
+          ${full ? front(p, i + 1) : back(p, i + 1)}
           <div class="pc-holo" aria-hidden="true"></div>
           <div class="pc-glare" aria-hidden="true"></div>
         </div>
@@ -258,25 +345,29 @@
     });
   });
 
-  /* holo tilt */
+  /* holo tilt (player cards + medal cards) */
   if (!reduceMotion && canHover) {
-    deck.addEventListener("pointermove", (e) => {
-      const card = e.target.closest(".pc");
-      if (!card) return;
-      const r = card.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width;
-      const y = (e.clientY - r.top) / r.height;
-      card.classList.add("is-active");
-      card.style.setProperty("--mx", `${x * 100}%`);
-      card.style.setProperty("--my", `${y * 100}%`);
-      card.style.setProperty("--ry", `${(x - 0.5) * 16}deg`);
-      card.style.setProperty("--rx", `${(0.5 - y) * 14}deg`);
-      card.style.setProperty("--hyp", Math.min(1, Math.hypot(x - 0.5, y - 0.5) * 2).toFixed(3));
-    });
-    deck.addEventListener(
+    addEventListener(
+      "pointermove",
+      (e) => {
+        const card = e.target.closest && e.target.closest(".tilt");
+        if (!card) return;
+        const r = card.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width;
+        const y = (e.clientY - r.top) / r.height;
+        card.classList.add("is-active");
+        card.style.setProperty("--mx", `${x * 100}%`);
+        card.style.setProperty("--my", `${y * 100}%`);
+        card.style.setProperty("--ry", `${(x - 0.5) * 16}deg`);
+        card.style.setProperty("--rx", `${(0.5 - y) * 14}deg`);
+        card.style.setProperty("--hyp", Math.min(1, Math.hypot(x - 0.5, y - 0.5) * 2).toFixed(3));
+      },
+      { passive: true }
+    );
+    addEventListener(
       "pointerout",
       (e) => {
-        const card = e.target.closest(".pc");
+        const card = e.target.closest && e.target.closest(".tilt");
         if (card && !card.contains(e.relatedTarget)) {
           card.classList.remove("is-active");
           card.style.setProperty("--rx", "0deg");
@@ -296,7 +387,7 @@
       $$(".pc", deck).forEach((c, i) => c.style.setProperty("--d", `${Math.min(i * 40, 900)}ms`));
       deck.classList.remove("is-waiting");
       deck.classList.add("is-in");
-    }, { threshold: 0.08 });
+    }, { threshold: 0, rootMargin: "0px 0px -10% 0px" });
     io.observe(deck);
   }
 
@@ -348,10 +439,43 @@
 
   /* ================================================================= nav */
   const nav = $("#nav");
-  const onScroll = () => nav.classList.toggle("is-scrolled", scrollY > 40);
+  const prog = $("#nav-progress");
+  const onScroll = () => {
+    nav.classList.toggle("is-scrolled", scrollY > 40);
+    const max = document.documentElement.scrollHeight - innerHeight;
+    prog.style.transform = `scaleX(${max > 0 ? Math.min(1, scrollY / max) : 0})`;
+  };
   addEventListener("scroll", onScroll, { passive: true });
   onScroll();
 
-  requestAnimationFrame(() => document.body.classList.add("is-ready"));
+  const navLinks = $$(".nav-links a");
+  const spy = new IntersectionObserver(
+    (entries) =>
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        navLinks.forEach((a) => a.classList.toggle("is-current", a.getAttribute("href") === `#${e.target.id}`));
+      }),
+    { rootMargin: "-45% 0px -50% 0px" }
+  );
+  ["about", "placements", "players"].forEach((id) => spy.observe(document.getElementById(id)));
+  new IntersectionObserver(([e]) => e.isIntersecting && navLinks.forEach((a) => a.classList.remove("is-current"))).observe($("#hero"));
+
+  $("#hud-r").innerHTML = `${players.length} players<i></i>${placements.length} ctfs`;
+
+  /* outro flower spins with scroll */
+  const outroFlower = $(".outro-flower");
+  if (outroFlower && !reduceMotion) {
+    addEventListener(
+      "scroll",
+      () => {
+        const r = outroFlower.parentElement.getBoundingClientRect();
+        const k = 1 - (r.top + r.height / 2) / (innerHeight + r.height);
+        outroFlower.style.setProperty("--spin", `${k * 140}deg`);
+      },
+      { passive: true }
+    );
+  }
+
+  (window.V1Intro || Promise.resolve()).then(() => requestAnimationFrame(() => document.body.classList.add("is-ready")));
   console.log("%cv1olet", "font: 800 28px sans-serif; color:#6840f4", "\nlooking around? there's a flag in the source.");
 })();

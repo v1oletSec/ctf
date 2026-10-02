@@ -21,6 +21,8 @@
  *   rank     – number
  *   note     – optional (e.g. "Average placement")
  *   field    – optional field size text
+ *   field    – optional field size text, e.g. "731 teams" or "1k+ teams".
+ *              If it contains a number, the site shows "Top x%" for that CTF.
  *   url      – optional link to the scoreboard / event
  */
 
@@ -39,6 +41,11 @@ window.V1 = {
     ai: "AI",
     redteam: "Red teaming",
     pentest: "Pentesting",
+    dfir: "DFIR",
+    ad: "Active Directory",
+    mobile: "Mobile",
+    sigint: "SIGINT/ELINT",
+    ew: "EW",
   },
 
   players: [
@@ -60,26 +67,24 @@ window.V1 = {
     {
       name: "Cyul",
       focus: "OSINT",
-      quote: "I bring together pieces to create a story",
-      skills: ["osint", "web", "misc"],
+      skills: ["osint"],
     },
-    { name: "Ame" },
     {
       name: "0x00knull",
       focus: "Offensive security",
       skills: ["redteam", "pentest", "pwn"],
     },
-    { name: "AmeenRMD" },
-    { name: "ecstasy" },
-    { name: "evlion48" },
-    { name: "Havel29" },
+    { name: "AmeenRMD", skills: ["web", "osint", "misc"] },
+    { name: "ecstasy", skills: ["rev", "forensics", "pwn"] },
+    { name: "evlion48", skills: ["forensics", "osint", "ad"] },
+    { name: "Havel29", skills: ["crypto"] },
     {
       name: "KeyboardCat",
       focus: "Generalist",
       quote: "I'm just here collecting skills until freedom becomes affordable.",
       skills: ["web", "rev", "osint", "misc"],
     },
-    { name: "LANGSOMT" },
+    { name: "LANGSOMT", skills: ["web", "forensics", "misc"] },
     {
       name: "Shedo",
       focus: "Crypto & quantum",
@@ -92,7 +97,7 @@ window.V1 = {
       skills: ["osint", "forensics"],
       links: { linkedin: "https://www.linkedin.com/in/laykyaw-tun/" },
     },
-    { name: "4y4n0k0j1" },
+    { name: "4y4n0k0j1", skills: ["forensics", "osint"] },
     {
       name: "0xTrojan",
       focus: "Generalist",
@@ -100,7 +105,7 @@ window.V1 = {
       skills: ["redteam", "ai", "web", "osint", "misc", "rev"],
       links: { github: "https://github.com/Tr0j4n1", website: "https://tr0j4n.tech/" },
     },
-    { name: "bambo" },
+    { name: "bambo", skills: ["pwn", "rev", "osint"] },
     {
       name: "ChampOfAll",
       focus: "Generalist",
@@ -120,10 +125,11 @@ window.V1 = {
       quote: "as above, so below",
       skills: ["pwn", "rev"],
     },
-    { name: "dalwyn" },
-    { name: "dem0z" },
-    { name: "dudlu121" },
-    { name: "dzban" },
+    { name: "dalwyn", skills: ["ai"] },
+    { name: "dem0z", skills: ["web", "mobile", "pwn"] },
+    { name: "YooHoo", skills: ["web"] },
+    { name: "dzban", skills: ["misc", "dfir", "osint"] },
+    { name: "Eoka", skills: ["web", "pwn", "osint"] },
     {
       name: "ff",
       focus: "Cloud & offensive security",
@@ -133,9 +139,9 @@ window.V1 = {
     {
       name: "holysith",
       focus: "Generalist",
-      skills: ["osint", "rev", "web", "misc"],
+      skills: ["pwn", "rev", "misc"],
     },
-    { name: "rax" },
+    { name: "rax", skills: ["pwn", "rev", "web"] },
     {
       name: "overtsleeping",
       focus: "OSINT",
@@ -143,7 +149,9 @@ window.V1 = {
       skills: ["osint"],
       links: { github: "https://github.com/justina1387/", website: "https://overtsleeping.com/" },
     },
-    { name: "sg0924" },
+    { name: "sg0924", skills: ["crypto", "osint"] },
+    { name: "Tr4ceAng3l", skills: ["forensics", "sigint", "ew"] },
+    { name: "ra1ncandy" },
   ],
 
   placements: [
